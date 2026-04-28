@@ -1,82 +1,33 @@
 import tkinter as tk
 from tkinter import messagebox
-import random
 import json
 import os
 from datetime import date
+import threading
+import time
+import random
 
+# ---------- DATA FILE ----------
 DATA_FILE = "data.json"
 
-# ---------- Load / Save ----------
 def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {"streak": 0, "last_date": "", "history": []}
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return {"streak": 0, "last_date": ""}
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
-data = load_data()
-
-# ---------- Suggestion Logic ----------
-def suggest_activity():
-    try:
-        screen_time = int(entry_time.get())
-        energy_level = energy_var.get().lower()
-    except:
-        result_label.config(text="⚠️ Enter valid input!")
-        return
-
-    threshold = 60
-
-    activities = [
-        {"name": "Take a walk for 10 minutes", "type": "physical", "score": 9},
-        {"name": "Stretch or exercise", "type": "physical", "score": 8},
-        {"name": "Read a chapter", "type": "cognitive", "score": 8},
-        {"name": "Listen to a podcast", "type": "passive", "score": 6},
-        {"name": "Call a friend", "type": "social", "score": 9}
-    ]
-
-    if screen_time <= threshold:
-        result_label.config(text="✅ You're within your limit!")
-        return
-
-    for activity in activities:
-        if energy_level == "low" and activity["type"] == "physical":
-            activity["score"] -= 2
-        elif energy_level == "high" and activity["type"] == "physical":
-            activity["score"] += 1
-
-        activity["score"] += random.randint(0, 2)
-
-    activities.sort(key=lambda x: x["score"], reverse=True)
-
-    top_score = activities[0]["score"]
-    top = [a for a in activities if a["score"] == top_score]
-    chosen = random.choice(top)
-
-    result = chosen["name"]
-    result_label.config(text=f"💡 {result}")
-
-    # Save history
-    data["history"].append(result)
-    save_data(data)
-
-    return result
-
-
-# ---------- Streak Logic ----------
+# ---------- STREAK ----------
 def update_streak():
+    data = load_data()
     today = str(date.today())
 
-    if data["last_date"] == today:
-        return
-
     if data["last_date"]:
-        yesterday = date.fromisoformat(data["last_date"])
-        if (date.today() - yesterday).days == 1:
+        last = date.fromisoformat(data["last_date"])
+        if (date.today() - last).days == 1:
             data["streak"] += 1
         else:
             data["streak"] = 1
@@ -86,87 +37,107 @@ def update_streak():
     data["last_date"] = today
     save_data(data)
 
-    streak_label.config(text=f"🔥 Streak: {data['streak']} days")
+    days_text = "day" if data["streak"] == 1 else "days"
+    streak_label.config(text=f"🔥 Streak: {data['streak']} {days_text}")
 
-
-# ---------- Timer ----------
-def start_focus():
+# ---------- SUGGESTION ----------
+def get_suggestion():
     try:
-        minutes = int(entry_time.get())
+        screen_time = int(screen_entry.get())
+        energy = energy_var.get()
+
+        if screen_time > 180:
+            if energy == "Low":
+                options = ["Take a nap 💤", "Relax your mind 🌿", "Listen to calm music 🎧"]
+            else:
+                options = ["Workout 💪", "Go for a walk 🚶", "Stretch 🧘"]
+
+        elif screen_time > 90:
+            options = ["Read a book 📖", "Listen to podcast 🎧", "Write something ✍️"]
+
+        else:
+            options = ["Stay focused 🔥", "You're doing great 💯", "Keep going 👏"]
+
+        suggestion = random.choice(options)
+        suggestion_label.config(text=f"💡 {suggestion}")
+
+        update_streak()
+
     except:
-        result_label.config(text="⚠️ Enter valid time!")
-        return
+        suggestion_label.config(text="⚠️ Enter valid number")
 
-    update_streak()
-    countdown(minutes * 60)
+# ---------- TIMER ----------
+def start_timer():
+    try:
+        minutes = int(timer_entry.get())
+        seconds = minutes * 60
 
+        def countdown():
+            nonlocal seconds
+            while seconds > 0:
+                mins, secs = divmod(seconds, 60)
+                timer_label.config(text=f"⏳ {mins:02}:{secs:02}")
+                time.sleep(1)
+                seconds -= 1
 
-def countdown(seconds):
-    if seconds > 0:
-        mins = seconds // 60
-        secs = seconds % 60
-        timer_label.config(text=f"{mins:02d}:{secs:02d}")
-        root.after(1000, countdown, seconds - 1)
-    else:
-        timer_label.config(text="⏰ Time's up!")
+            timer_label.config(text="⏰ Time's up!")
+            messagebox.showinfo("Break Time!", "Take a break 😊")
 
-        suggestion = suggest_activity()
+        threading.Thread(target=countdown, daemon=True).start()
 
-        # Popup alert
-        messagebox.showinfo("Break Time!", f"Try this instead:\n\n{suggestion}")
-
+    except:
+        timer_label.config(text="⚠️ Enter valid time")
 
 # ---------- UI ----------
 root = tk.Tk()
-root.title("Dopamine Focus App")
-root.geometry("420x460")
-root.configure(bg="#e8f0f2")
+root.title("FocusFlow - Dopamine Regulation")
+root.geometry("420x450")
+root.configure(bg="#1e1e1e")
 
-card = tk.Frame(root, bg="white")
-card.place(relx=0.5, rely=0.5, anchor="center", width=350, height=400)
+# Title
+tk.Label(root, text="🧠 FocusFlow", font=("Arial", 16, "bold"),
+         bg="#1e1e1e", fg="white").pack(pady=10)
 
-tk.Label(card, text="🧠 Focus Mode",
-         font=("Segoe UI", 16, "bold"),
-         bg="white").pack(pady=10)
+# Screen input
+tk.Label(root, text="Screen Time (minutes)", bg="#1e1e1e", fg="white").pack()
+screen_entry = tk.Entry(root)
+screen_entry.pack(pady=5)
 
-# Streak display
-streak_label = tk.Label(card, text=f"🔥 Streak: {data['streak']} days",
-                        bg="white", font=("Segoe UI", 10))
-streak_label.pack()
+# Energy
+tk.Label(root, text="Energy Level", bg="#1e1e1e", fg="white").pack()
 
-tk.Label(card, text="Time (minutes)", bg="white").pack()
-entry_time = tk.Entry(card, justify="center")
-entry_time.pack(pady=5)
+energy_var = tk.StringVar(value="Low")
 
-tk.Label(card, text="Energy Level", bg="white").pack()
+tk.Radiobutton(root, text="Low", variable=energy_var, value="Low",
+               bg="#1e1e1e", fg="white", selectcolor="#333").pack()
+tk.Radiobutton(root, text="High", variable=energy_var, value="High",
+               bg="#1e1e1e", fg="white", selectcolor="#333").pack()
 
-energy_var = tk.StringVar(value="low")
+# Button
+tk.Button(root, text="Get Suggestion", command=get_suggestion,
+          bg="#333", fg="white").pack(pady=10)
 
-frame_radio = tk.Frame(card, bg="white")
-frame_radio.pack()
+# Suggestion output
+suggestion_label = tk.Label(root, text="", bg="#1e1e1e", fg="white")
+suggestion_label.pack()
 
-tk.Radiobutton(frame_radio, text="Low", variable=energy_var,
-               value="low", bg="white").pack(side="left", padx=10)
+# Streak
+streak_label = tk.Label(root, text="🔥 Streak: 0 days",
+                        bg="#1e1e1e", fg="white")
+streak_label.pack(pady=10)
 
-tk.Radiobutton(frame_radio, text="High", variable=energy_var,
-               value="high", bg="white").pack(side="left", padx=10)
+# Timer
+tk.Label(root, text="Focus Timer (minutes)",
+         bg="#1e1e1e", fg="white").pack()
 
-tk.Button(card, text="💡 Get Suggestion",
-          command=suggest_activity,
-          bg="#4CAF50", fg="white", width=20).pack(pady=8)
+timer_entry = tk.Entry(root)
+timer_entry.pack()
 
-tk.Button(card, text="⏱️ Start Focus",
-          command=start_focus,
-          bg="#2196F3", fg="white", width=20).pack(pady=5)
+timer_label = tk.Label(root, text="⏳ Timer",
+                       bg="#1e1e1e", fg="white")
+timer_label.pack(pady=5)
 
-timer_label = tk.Label(card, text="",
-                       font=("Segoe UI", 14, "bold"),
-                       bg="white")
-timer_label.pack(pady=10)
-
-result_label = tk.Label(card, text="",
-                        wraplength=250,
-                        bg="white")
-result_label.pack(pady=10)
+tk.Button(root, text="Start Timer", command=start_timer,
+          bg="#444", fg="white").pack()
 
 root.mainloop()
