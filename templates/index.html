@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Better Habits</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            width: 350px;
+            margin: auto;
+            border-radius: 10px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .activity {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Better Habits</h1>
+
+<a href="/settings">
+    <button>Settings ⚙️</button>
+</a>
+
+<div class="box">
+
+    <h3>Points: {{ points }} / 50</h3>
+    <p>Progress: {{ progress }}%</p>
+
+    <!-- FORM -->
+    <form method="POST">
+        <input type="number" name="time" placeholder="Enter screen time (mins)" required><br><br>
+
+        <p>Energy Level:</p>
+        <button type="submit" name="energy" value="high">High</button>
+        <button type="submit" name="energy" value="low">Low</button>
+    </form>
+
+    <!-- MESSAGE -->
+    <h3>{{ message }}</h3>
+
+    <!-- ACTIVITIES -->
+    {% if show %}
+        <h4>Choose an activity:</h4>
+
+        {% for act, pts in activities %}
+            <form action="/add_points" method="POST" class="activity">
+                <input type="hidden" name="points" value="{{ pts }}">
+                <button type="submit">
+                    {{ act }} (+{{ pts }} pts)
+                </button>
+            </form>
+        {% endfor %}
+    {% endif %}
+
+    <br>
+    <a href="/reset">Reset Day</a>
+
+</div>
+
+</body>
+</html>
